@@ -3,210 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Система комментариев</title>
+    <title>Комментарии</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-            width: 90%;
-            max-width: 600px;
-        }
-        input, textarea, select {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        button {
-            padding: 10px;
-            margin: 5px;
-            background: #007bff;
-            border: none;
-            color: white;
-            font-size: 14px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        button:hover {
-            background: #0056b3;
-        }
-        .comment-box {
-            background: #f9f9f9;
-            padding: 10px;
-            margin-top: 10px;
-            border-left: 4px solid #007bff;
-            border-radius: 5px;
-        }
-        .reply-box {
-            margin-left: 20px;
-            border-left: 2px solid #ccc;
-            padding-left: 10px;
-        }
-        .tag {
-            font-weight: bold;
-            color: white;
-            padding: 3px 7px;
-            border-radius: 5px;
-        }
-        .Баг { background: red; }
-        .Ошибка { background: orange; }
-        .Вирус { background: purple; }
-        .Вопрос { background: blue; }
-        .Оценка { background: green; }
-        .Другое { background: gray; }
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; }
+        textarea { width: 100%; height: 80px; padding: 10px; }
+        button { padding: 10px 15px; margin-top: 5px; cursor: pointer; }
+        ul { list-style: none; padding: 0; }
+        li { background: #f4f4f4; margin: 5px 0; padding: 10px; }
     </style>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, push, set, update, remove, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js"></script>
+
+    <script>
+        console.log("Проверяем Firebase...");
 
         const firebaseConfig = {
             apiKey: "AIzaSyDa0FAsfEfbmKftbipZsIXz5hZoW1WIQFQ",
             authDomain: "comments-aa1fb.firebaseapp.com",
             databaseURL: "https://comments-aa1fb-default-rtdb.europe-west1.firebasedatabase.app",
             projectId: "comments-aa1fb",
-            storageBucket: "comments-aa1fb.firebasestorage.app",
+            storageBucket: "comments-aa1fb.appspot.com",
             messagingSenderId: "699556396912",
             appId: "1:699556396912:web:d81ccd29e8bf44af67d9b5",
             measurementId: "G-EQD9ZVS550"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
-        
-        let currentUser = localStorage.getItem("username") || prompt("Введите ваше имя:");
-        localStorage.setItem("username", currentUser);
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-        window.addComment = function (parentId = null) {
-            const username = currentUser;
-            const commentText = document.getElementById("commentText").value.trim();
-            const tag = document.getElementById("commentTag").value;
+        function addComment() {
+            const commentInput = document.getElementById("commentInput");
+            const commentText = commentInput.value.trim();
 
             if (commentText === "") {
                 alert("Введите комментарий!");
                 return;
             }
 
-            const commentRef = parentId ? ref(database, `comments/${parentId}/replies`) : ref(database, "comments");
-
-            push(commentRef, {
-                username: username,
-                text: commentText,
-                tag: tag,
-                timestamp: Date.now(),
-                likes: 0,
-                dislikes: 0,
-                likedBy: {}
-            }).then(() => {
-                document.getElementById("commentText").value = "";
-            });
-        };
+            db.ref("comments").push({ text: commentText })
+                .then(() => {
+                    alert("✅ Комментарий добавлен!");
+                    commentInput.value = "";
+                })
+                .catch(error => {
+                    alert("❌ Ошибка добавления: " + error.message);
+                });
+        }
 
         function loadComments() {
-            const commentsRef = ref(database, "comments");
-            onValue(commentsRef, (snapshot) => {
-                const commentsList = document.getElementById("commentsList");
+            const commentsList = document.getElementById("commentsList");
+            db.ref("comments").on("value", snapshot => {
                 commentsList.innerHTML = "";
-
                 snapshot.forEach(childSnapshot => {
-                    const comment = childSnapshot.val();
-                    const commentId = childSnapshot.key;
-                    displayComment(comment, commentId, commentsList);
+                    const li = document.createElement("li");
+                    li.textContent = childSnapshot.val().text;
+                    commentsList.appendChild(li);
                 });
             });
         }
-
-        function displayComment(comment, commentId, container) {
-            const div = document.createElement("div");
-            div.classList.add("comment-box");
-            div.innerHTML = `
-                <span class="tag ${comment.tag}">${comment.tag}</span> 
-                <strong>${comment.username}:</strong> <span id="text-${commentId}">${comment.text}</span>
-                <div class="actions">
-                    <button onclick="likeComment('${commentId}')" ${comment.likedBy?.[currentUser] ? "disabled" : ""}>👍 ${comment.likes || 0}</button>
-                    <button onclick="dislikeComment('${commentId}')" ${comment.likedBy?.[currentUser] ? "disabled" : ""}>👎 ${comment.dislikes || 0}</button>
-                    ${comment.username === currentUser ? `
-                        <button onclick="editComment('${commentId}', '${comment.text}')">✏️ Редактировать</button>
-                        <button onclick="deleteComment('${commentId}')">❌ Удалить</button>
-                    ` : ""}
-                    <button onclick="replyComment('${commentId}', '${comment.username}')">💬 Ответить</button>
-                </div>
-                <div id="replies-${commentId}" class="reply-box"></div>
-            `;
-
-            container.prepend(div);
-
-            if (comment.replies) {
-                Object.entries(comment.replies).forEach(([replyId, reply]) => {
-                    displayComment(reply, replyId, div.querySelector(`#replies-${commentId}`));
-                });
-            }
-        }
-
-        window.editComment = function(commentId, oldText) {
-            const newText = prompt("Редактировать комментарий:", oldText);
-            if (newText) {
-                update(ref(database, `comments/${commentId}`), { text: newText });
-            }
-        };
-
-        window.deleteComment = function(commentId) {
-            if (confirm("Удалить этот комментарий?")) {
-                remove(ref(database, `comments/${commentId}`));
-            }
-        };
-
-        window.likeComment = function(commentId) {
-            const commentRef = ref(database, `comments/${commentId}`);
-            update(commentRef, { likes: (comment.likes || 0) + 1, [`likedBy/${currentUser}`]: true });
-        };
-
-        window.dislikeComment = function(commentId) {
-            const commentRef = ref(database, `comments/${commentId}`);
-            update(commentRef, { dislikes: (comment.dislikes || 0) + 1, [`likedBy/${currentUser}`]: true });
-        };
-
-        window.replyComment = function(commentId, username) {
-            const replyText = prompt(`Ответ на комментарий ${username}:`);
-            if (replyText) {
-                addComment(commentId, replyText);
-            }
-        };
 
         window.onload = loadComments;
     </script>
 </head>
 <body>
-    <div class="container">
-        <h2>Оставьте комментарий</h2>
-        <textarea id="commentText" placeholder="Введите комментарий"></textarea>
-        <select id="commentTag">
-            <option value="Баг">Баг</option>
-            <option value="Ошибка">Ошибка</option>
-            <option value="Вирус">Вирус</option>
-            <option value="Вопрос">Вопрос</option>
-            <option value="Оценка">Оценка</option>
-            <option value="Другое">Другое</option>
-        </select>
-        <button onclick="addComment()">Добавить</button>
-
-        <h2>Комментарии:</h2>
-        <div id="commentsList"></div>
-    </div>
+    <h2>Комментарии</h2>
+    <textarea id="commentInput" placeholder="Введите комментарий..."></textarea>
+    <button onclick="addComment()">Добавить комментарий</button>
+    <ul id="commentsList"></ul>
 </body>
 </html>
