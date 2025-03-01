@@ -88,14 +88,17 @@
 
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
+        
+        let currentUser = localStorage.getItem("username") || prompt("Введите ваше имя:");
+        localStorage.setItem("username", currentUser);
 
         window.addComment = function (parentId = null) {
-            const username = document.getElementById("username").value.trim();
+            const username = currentUser;
             const commentText = document.getElementById("commentText").value.trim();
             const tag = document.getElementById("commentTag").value;
 
-            if (username === "" || commentText === "") {
-                alert("Введите имя и комментарий!");
+            if (commentText === "") {
+                alert("Введите комментарий!");
                 return;
             }
 
@@ -107,12 +110,10 @@
                 tag: tag,
                 timestamp: Date.now(),
                 likes: 0,
-                dislikes: 0
+                dislikes: 0,
+                likedBy: {}
             }).then(() => {
-                document.getElementById("username").value = "";
                 document.getElementById("commentText").value = "";
-            }).catch(error => {
-                console.error("Ошибка при добавлении комментария: ", error);
             });
         };
 
@@ -137,10 +138,12 @@
                 <span class="tag ${comment.tag}">${comment.tag}</span> 
                 <strong>${comment.username}:</strong> <span id="text-${commentId}">${comment.text}</span>
                 <div class="actions">
-                    <button onclick="likeComment('${commentId}')">👍 ${comment.likes || 0}</button>
-                    <button onclick="dislikeComment('${commentId}')">👎 ${comment.dislikes || 0}</button>
-                    <button onclick="editComment('${commentId}', '${comment.text}')">✏️ Редактировать</button>
-                    <button onclick="deleteComment('${commentId}')">❌ Удалить</button>
+                    <button onclick="likeComment('${commentId}')" ${comment.likedBy?.[currentUser] ? "disabled" : ""}>👍 ${comment.likes || 0}</button>
+                    <button onclick="dislikeComment('${commentId}')" ${comment.likedBy?.[currentUser] ? "disabled" : ""}>👎 ${comment.dislikes || 0}</button>
+                    ${comment.username === currentUser ? `
+                        <button onclick="editComment('${commentId}', '${comment.text}')">✏️ Редактировать</button>
+                        <button onclick="deleteComment('${commentId}')">❌ Удалить</button>
+                    ` : ""}
                     <button onclick="replyComment('${commentId}', '${comment.username}')">💬 Ответить</button>
                 </div>
                 <div id="replies-${commentId}" class="reply-box"></div>
@@ -170,22 +173,12 @@
 
         window.likeComment = function(commentId) {
             const commentRef = ref(database, `comments/${commentId}`);
-            onValue(commentRef, (snapshot) => {
-                if (snapshot.exists()) {
-                    const likes = snapshot.val().likes || 0;
-                    update(commentRef, { likes: likes + 1 });
-                }
-            }, { onlyOnce: true });
+            update(commentRef, { likes: (comment.likes || 0) + 1, [`likedBy/${currentUser}`]: true });
         };
 
         window.dislikeComment = function(commentId) {
             const commentRef = ref(database, `comments/${commentId}`);
-            onValue(commentRef, (snapshot) => {
-                if (snapshot.exists()) {
-                    const dislikes = snapshot.val().dislikes || 0;
-                    update(commentRef, { dislikes: dislikes + 1 });
-                }
-            }, { onlyOnce: true });
+            update(commentRef, { dislikes: (comment.dislikes || 0) + 1, [`likedBy/${currentUser}`]: true });
         };
 
         window.replyComment = function(commentId, username) {
@@ -199,10 +192,8 @@
     </script>
 </head>
 <body>
-
     <div class="container">
         <h2>Оставьте комментарий</h2>
-        <input type="text" id="username" placeholder="Ваше имя">
         <textarea id="commentText" placeholder="Введите комментарий"></textarea>
         <select id="commentTag">
             <option value="Баг">Баг</option>
@@ -212,11 +203,10 @@
             <option value="Оценка">Оценка</option>
             <option value="Другое">Другое</option>
         </select>
-        <button onclick="addComment()">Добавить комментарий</button>
+        <button onclick="addComment()">Добавить</button>
 
         <h2>Комментарии:</h2>
         <div id="commentsList"></div>
     </div>
-
 </body>
 </html>
