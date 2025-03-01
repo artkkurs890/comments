@@ -5,72 +5,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Комментарии</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; }
-        textarea { width: 100%; height: 80px; padding: 10px; }
-        button { padding: 10px 15px; margin-top: 5px; cursor: pointer; }
-        ul { list-style: none; padding: 0; }
-        li { background: #f4f4f4; margin: 5px 0; padding: 10px; }
+        body { font-family: Arial, sans-serif; }
+        #comments { margin-top: 20px; }
+        .comment { padding: 10px; border: 1px solid #ccc; margin-top: 5px; }
     </style>
+</head>
+<body>
+    <h2>Комментарии</h2>
+    <input type="text" id="username" placeholder="Введите имя">
+    <textarea id="commentInput" placeholder="Введите комментарий"></textarea>
+    <button id="submitComment">Добавить комментарий</button>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js"></script>
+    <div id="comments"></div>
 
-    <script>
-        console.log("Проверяем Firebase...");
+    <script type="module">
+        // Загружаем Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
 
+        // Конфигурация Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDa0FAsfEfbmKftbipZsIXz5hZoW1WIQFQ",
             authDomain: "comments-aa1fb.firebaseapp.com",
             databaseURL: "https://comments-aa1fb-default-rtdb.europe-west1.firebasedatabase.app",
             projectId: "comments-aa1fb",
-            storageBucket: "comments-aa1fb.appspot.com",
+            storageBucket: "comments-aa1fb.firebasestorage.app",
             messagingSenderId: "699556396912",
             appId: "1:699556396912:web:d81ccd29e8bf44af67d9b5",
             measurementId: "G-EQD9ZVS550"
         };
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        // Инициализация Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const commentsRef = ref(db, "comments");
 
-        function addComment() {
-            const commentInput = document.getElementById("commentInput");
-            const commentText = commentInput.value.trim();
+        console.log("✅ Firebase загружен:", app);
 
-            if (commentText === "") {
-                alert("Введите комментарий!");
+        // Функция добавления комментария
+        document.getElementById("submitComment").addEventListener("click", () => {
+            const username = document.getElementById("username").value.trim();
+            const commentText = document.getElementById("commentInput").value.trim();
+
+            if (username === "" || commentText === "") {
+                alert("Введите имя и комментарий!");
                 return;
             }
 
-            db.ref("comments").push({ text: commentText })
-                .then(() => {
-                    alert("✅ Комментарий добавлен!");
-                    commentInput.value = "";
-                })
-                .catch(error => {
-                    alert("❌ Ошибка добавления: " + error.message);
-                });
-        }
-
-        function loadComments() {
-            const commentsList = document.getElementById("commentsList");
-            db.ref("comments").on("value", snapshot => {
-                commentsList.innerHTML = "";
-                snapshot.forEach(childSnapshot => {
-                    const li = document.createElement("li");
-                    li.textContent = childSnapshot.val().text;
-                    commentsList.appendChild(li);
-                });
+            push(commentsRef, {
+                username: username,
+                text: commentText,
+                timestamp: Date.now()
             });
-        }
 
-        window.onload = loadComments;
+            document.getElementById("commentInput").value = ""; // Очищаем поле
+        });
+
+        // Функция загрузки комментариев
+        onValue(commentsRef, (snapshot) => {
+            const commentsDiv = document.getElementById("comments");
+            commentsDiv.innerHTML = ""; // Очищаем перед обновлением
+
+            snapshot.forEach((childSnapshot) => {
+                const data = childSnapshot.val();
+                const commentElement = document.createElement("div");
+                commentElement.classList.add("comment");
+                commentElement.innerHTML = `<b>${data.username}:</b> ${data.text}`;
+                commentsDiv.appendChild(commentElement);
+            });
+        });
     </script>
-</head>
-<body>
-    <h2>Комментарии</h2>
-    <textarea id="commentInput" placeholder="Введите комментарий..."></textarea>
-    <button onclick="addComment()">Добавить комментарий</button>
-    <ul id="commentsList"></ul>
 </body>
 </html>
