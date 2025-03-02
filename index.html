@@ -6,90 +6,176 @@
     <title>Комментарии</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
-        .container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
-        .comment { padding: 10px; border-bottom: 1px solid #ddd; position: relative; }
-        .comment .actions { font-size: 14px; color: #007bff; cursor: pointer; margin-right: 10px; }
-        .replies { margin-left: 20px; border-left: 2px solid #ddd; padding-left: 10px; }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .comment {
+            background: white;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .comment strong {
+            color: #007bff;
+        }
+        .actions {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .actions span {
+            color: #007bff;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: 0.3s;
+        }
+        .actions span:hover {
+            color: #0056b3;
+        }
+        .reply-box {
+            display: none;
+            margin-top: 10px;
+        }
+        .reply-box input {
+            width: 80%;
+            padding: 5px;
+        }
+        .reply-box button {
+            width: auto;
+            padding: 5px 10px;
+        }
+        .replies {
+            margin-left: 20px;
+            border-left: 3px solid #ddd;
+            padding-left: 10px;
+            margin-top: 10px;
+        }
+        .replies .comment {
+            background: #f9f9f9;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>Комментарии</h2>
-        <input type="text" id="username" placeholder="Ваше имя" style="width: 100%; padding: 10px; margin-bottom: 10px;">
-        <textarea id="comment" placeholder="Введите комментарий" style="width: 100%; height: 80px; padding: 10px;"></textarea>
+        <input type="text" id="username" placeholder="Ваше имя">
+        <textarea id="comment" placeholder="Введите комментарий"></textarea>
         <button onclick="addComment()">Добавить</button>
         <div id="comments"></div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
     <script>
-        let comments = [];
+        const firebaseConfig = {
+            apiKey: "AIzaSyDa0FAsfEfbmKftbipZsIXz5hZoW1WIQFQ",
+            authDomain: "comments-aa1fb.firebaseapp.com",
+            databaseURL: "https://comments-aa1fb-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "comments-aa1fb",
+            storageBucket: "comments-aa1fb.firebasestorage.app",
+            messagingSenderId: "699556396912",
+            appId: "1:699556396912:web:d81ccd29e8bf44af67d9b5"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
         function addComment(replyTo = null) {
             const username = document.getElementById("username").value.trim();
-            const commentText = document.getElementById("comment").value.trim();
+            const commentText = replyTo ? 
+                document.getElementById(`reply-input-${replyTo}`).value.trim() : 
+                document.getElementById("comment").value.trim();
+
             if (!username || !commentText) return;
-            
-            const newComment = { id: Date.now(), username, text: commentText, replies: [] };
+
+            const newComment = { username, text: commentText };
+
             if (replyTo) {
-                const parentComment = comments.find(c => c.id === replyTo);
-                if (parentComment) parentComment.replies.push(newComment);
+                db.ref(`comments/${replyTo}/replies`).push(newComment);
+                document.getElementById(`reply-input-${replyTo}`).value = "";
+                toggleReplyBox(replyTo);
             } else {
-                comments.push(newComment);
-            }
-            document.getElementById("comment").value = "";
-            renderComments();
-        }
-
-        function editComment(id) {
-            const newText = prompt("Редактировать комментарий:");
-            if (!newText) return;
-            const comment = findComment(id);
-            if (comment) {
-                comment.text = newText;
-                renderComments();
+                db.ref("comments").push(newComment);
+                document.getElementById("comment").value = "";
             }
         }
 
-        function deleteComment(id) {
-            comments = comments.filter(c => c.id !== id && (!c.replies || c.replies.every(r => r.id !== id)));
-            renderComments();
+        function toggleReplyBox(commentId) {
+            const replyBox = document.getElementById(`reply-box-${commentId}`);
+            replyBox.style.display = replyBox.style.display === "none" ? "block" : "none";
         }
 
-        function replyComment(id) {
-            const replyText = prompt("Ваш ответ:");
-            if (!replyText) return;
-            addComment(id);
-        }
-
-        function findComment(id, list = comments) {
-            for (let comment of list) {
-                if (comment.id === id) return comment;
-                const found = findComment(id, comment.replies);
-                if (found) return found;
-            }
-            return null;
-        }
-
-        function renderComments(list = comments, parent = document.getElementById("comments")) {
-            parent.innerHTML = "";
-            list.forEach(comment => {
+        function renderComments(comments, parentElement) {
+            parentElement.innerHTML = "";
+            Object.keys(comments).forEach(id => {
+                const comment = comments[id];
                 const div = document.createElement("div");
                 div.classList.add("comment");
                 div.innerHTML = `
                     <strong>${comment.username}</strong>: ${comment.text}
                     <div class="actions">
-                        <span onclick="editComment(${comment.id})">✏️ Редактировать</span>
-                        <span onclick="deleteComment(${comment.id})">❌ Удалить</span>
-                        <span onclick="replyComment(${comment.id})">💬 Ответить</span>
+                        <span onclick="toggleReplyBox('${id}')">💬 Ответить</span>
+                    </div>
+                    <div id="reply-box-${id}" class="reply-box">
+                        <input type="text" id="reply-input-${id}" placeholder="Ваш ответ...">
+                        <button onclick="addComment('${id}')">Отправить</button>
                     </div>
                     <div class="replies"></div>
                 `;
-                parent.appendChild(div);
-                if (comment.replies.length) {
+                parentElement.appendChild(div);
+
+                if (comment.replies) {
                     renderComments(comment.replies, div.querySelector(".replies"));
                 }
             });
         }
+
+        function loadComments() {
+            db.ref("comments").on("value", snapshot => {
+                const comments = snapshot.val() || {};
+                renderComments(comments, document.getElementById("comments"));
+            });
+        }
+
+        loadComments();
     </script>
 </body>
 </html>
